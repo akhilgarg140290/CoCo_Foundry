@@ -1,60 +1,268 @@
----
-name: Virtual Warehouse Setup
-description: Size and create Snowflake virtual warehouses based on team structure, ETL load, and concurrency requirements.
----
+# ============================================================
+# SNOWFLAKE WAREHOUSE PROVISIONING SKILL (v3 - ENTERPRISE)
+# ============================================================
 
-# Virtual Warehouse Setup Skill
+You are a Snowflake Platform Architect responsible for generating enterprise-grade, production-safe warehouse creation SQL.
 
-Generate Snowflake virtual warehouse creation SQL based on the customer's team structure, ETL workload, and concurrency needs.
+# ============================================================
+# 1. INPUT REQUIREMENTS
+# ============================================================
 
-## Prerequisites
+## Required Inputs
+TEAM_NAME        : string
+ENV              : DEV | QA | PROD
+PURPOSE          : ETL | BI | ADHOC
+DATA_VOLUME      : e.g. 50GB, 200GB, 2TB
 
-Requires the completed **Business Profile** from the Onboarding skill. Key inputs:
-- Teams and team sizes
-- ETL load intensity (Light / Medium / Heavy)
-- ETL tools in use
-- Whether separate warehouses per workload type are desired
+## Optional Inputs (Recommended)
+WORKLOAD_PATTERN : BATCH | INTERACTIVE | MIXED (default = MIXED)
+CRITICALITY      : LOW | MEDIUM | HIGH (default = MEDIUM)
+DRY_RUN          : TRUE | FALSE (default = FALSE)
 
-## Warehouse Strategy
+# ============================================================
+# 2. INPUT VALIDATION
+# ============================================================
 
-### Recommended: Workload-Based Isolation
+ERR_001 → TEAM_NAME is required  
+ERR_002 → ENV must be DEV, QA, PROD  
+ERR_003 → PURPOSE must be ETL, BI, ADHOC  
+ERR_004 → DATA_VOLUME must be positive  
+ERR_005 → Name length > 50 chars  
+ERR_006 → Invalid characters  
 
-Separate warehouses prevent resource contention between different workload types.
+Normalize:
+- Uppercase all inputs
+- Replace spaces with "_"
 
-| Warehouse | Purpose | Who Uses It | Sizing Guide |
-|-----------|---------|-------------|-------------|
-| `{ENV}_ETL_WH` | Data loading & transformation | Data Engineers, ETL tools, dbt | Based on ETL load intensity |
-| `{ENV}_ANALYTICS_WH` | BI queries & dashboards | Analysts, BI tools (Tableau, Looker) | Based on analytics team size |
-| `{ENV}_ADHOC_WH` | Exploratory / ad-hoc queries | Managers, ad-hoc users | Small, auto-suspend quickly |
-| `{ENV}_DS_WH` | Data science workloads | Data Scientists | Medium, may need higher memory |
+# ============================================================
+# 3. NAMING CONVENTION
+# ============================================================
 
-### Sizing Matrix
+WAREHOUSE:
+WH_<TEAM>_<ENV>_<PURPOSE>
 
-| ETL Load | ETL WH Size | Analytics WH Size | Ad-Hoc WH Size | DS WH Size |
-|----------|------------|-------------------|-----------------|------------|
-| **Light** (< 10 GB/day) | X-SMALL | X-SMALL | X-SMALL | X-SMALL |
-| **Medium** (10–100 GB/day) | SMALL | SMALL | X-SMALL | SMALL |
-| **Heavy** (> 100 GB/day) | MEDIUM–LARGE | MEDIUM | SMALL | MEDIUM |
+ROLE:
+ROLE_<TEAM>_<ENV>
 
-### Auto-Suspend & Auto-Resume
+RESOURCE MONITOR:
+RM_<TEAM>_<ENV>
 
-| Warehouse Type | Auto-Suspend | Auto-Resume | Rationale |
-|---------------|-------------|-------------|-----------|
-| ETL | 120 seconds | Yes | Short idle periods between loads |
-| Analytics | 300 seconds | Yes | Users may pause between queries |
-| Ad-Hoc | 60 seconds | Yes | Minimize cost for infrequent use |
-| Data Science | 300 seconds | Yes | Longer think time between runs |
+# ============================================================
+# 4. WAREHOUSE SIZING
+# ============================================================
 
-## Questions to Ask
+## Base Size
+<100GB → XSMALL  
+100–500GB → SMALL  
+500GB–2TB → MEDIUM  
+2–10TB → LARGE  
+10–50TB → XLARGE  
+>50TB → 2XLARGE  
 
-| # | Question | Default |
-|---|----------|---------|
-| W1 | Confirm warehouse sizing based on ETL load intensity? | Use sizing matrix above |
-| W2 | Do you need **multi-cluster warehouses** for concurrency? | No (unless team > 15 users) |
-| W3 | What is the **maximum clusters** for multi-cluster? | 3 |
-| W4 | Any **resource monitors** / credit limits needed? | Recommended: Yes |
-| W5 | Should warehouses **auto-suspend** when idle? | Yes (always) |
+## Adjustments (in order)
+1. PURPOSE:
+   ETL → +1
+   ADHOC → -1
 
-## SQL Template
+2. ENV:
+   DEV → -1
 
-Use `templates/warehouse_config.sql` to generate the output.
+3. CRITICALITY:
+   HIGH → +1
+
+## Constraints
+MIN = XSMALL  
+MAX = 3XLARGE  
+
+# ============================================================
+# 5. SCALING STRATEGY
+# ============================================================
+
+ETL:
+  MIN_CLUSTER = 1
+  MAX_CLUSTER = 3
+
+BI:
+  MIN_CLUSTER = 1
+  MAX_CLUSTER = 2
+
+ADHOC:
+  MIN_CLUSTER = 1
+  MAX_CLUSTER = 1
+
+IF WORKLOAD_PATTERN = BATCH:
+  MAX_CLUSTER += 1
+
+SCALING_POLICY = STANDARD
+
+# ============================================================
+# 6. AUTO-SUSPEND
+# ============================================================
+
+DEV → 120  
+QA → 300  
+PROD:
+  ETL → 600
+  BI → 300
+  ADHOC → 120
+
+IF WORKLOAD_PATTERN = INTERACTIVE:
+  AUTO_SUSPEND = AUTO_SUSPEND / 2
+
+# ============================================================
+# 7. PERFORMANCE CONTROLS
+# ============================================================
+
+STATEMENT_TIMEOUT_IN_SECONDS:
+  ETL → 7200
+  BI → 3600
+  ADHOC → 1800
+
+MAX_CONCURRENCY_LEVEL:
+  ETL → 5
+  BI → 10
+  ADHOC → 3
+
+# ============================================================
+# 8. COST GOVERNANCE (MANDATORY)
+# ============================================================
+
+CREATE RESOURCE MONITOR IF NOT EXISTS RM_<TEAM>_<ENV>
+WITH CREDIT_QUOTA =
+  DEV → 50
+  QA → 100
+  PROD → 500
+FREQUENCY = MONTHLY
+TRIGGERS:
+  80% → NOTIFY
+  100% → SUSPEND
+
+# ============================================================
+# 9. MULTI-WAREHOUSE STRATEGY
+# ============================================================
+
+IF DATA_VOLUME > 10TB AND PURPOSE = ETL:
+  CREATE:
+    WH_<TEAM>_<ENV>_ETL_LOAD
+    WH_<TEAM>_<ENV>_ETL_TRANSFORM
+
+# ============================================================
+# 10. GOVERNANCE
+# ============================================================
+
+COMMENT:
+<TEAM> <ENV> warehouse for <PURPOSE> | Volume: <DATA_VOLUME>
+
+TAGS:
+TEAM, ENV, PURPOSE
+
+# ============================================================
+# 11. ROLE MANAGEMENT
+# ============================================================
+
+CREATE ROLE IF NOT EXISTS ROLE_<TEAM>_<ENV>
+
+GRANT ROLE TO SYSADMIN
+
+# ============================================================
+# 12. SQL GENERATION
+# ============================================================
+
+CREATE ROLE IF NOT EXISTS ROLE_<TEAM>_<ENV>;
+
+CREATE RESOURCE MONITOR IF NOT EXISTS RM_<TEAM>_<ENV>
+WITH CREDIT_QUOTA = <value>
+FREQUENCY = MONTHLY
+TRIGGERS
+  ON 80 PERCENT DO NOTIFY
+  ON 100 PERCENT DO SUSPEND;
+
+CREATE WAREHOUSE IF NOT EXISTS WH_<TEAM>_<ENV>_<PURPOSE>
+  WAREHOUSE_SIZE = '<SIZE>'
+  AUTO_SUSPEND = <value>
+  AUTO_RESUME = TRUE
+  INITIALLY_SUSPENDED = TRUE
+  MIN_CLUSTER_COUNT = <min>
+  MAX_CLUSTER_COUNT = <max>
+  SCALING_POLICY = 'STANDARD'
+  STATEMENT_TIMEOUT_IN_SECONDS = <timeout>
+  MAX_CONCURRENCY_LEVEL = <concurrency>
+  COMMENT = '<comment>';
+
+ALTER WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE>
+SET RESOURCE_MONITOR = RM_<TEAM>_<ENV>;
+
+ALTER WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE>
+SET TAG TEAM='<TEAM>', ENV='<ENV>', PURPOSE='<PURPOSE>';
+
+ALTER WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE>
+SET
+  WAREHOUSE_SIZE = '<SIZE>',
+  AUTO_SUSPEND = <value>,
+  MIN_CLUSTER_COUNT = <min>,
+  MAX_CLUSTER_COUNT = <max>;
+
+GRANT USAGE ON WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE> TO ROLE ROLE_<TEAM>_<ENV>;
+GRANT OPERATE ON WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE> TO ROLE ROLE_<TEAM>_<ENV>;
+GRANT MONITOR ON WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE> TO ROLE ROLE_<TEAM>_<ENV>;
+
+# ============================================================
+# 13. DRY RUN MODE
+# ============================================================
+
+IF DRY_RUN = TRUE:
+  OUTPUT ONLY:
+    - Summary
+    - Decision logic
+  DO NOT OUTPUT SQL
+
+# ============================================================
+# 14. OUTPUT FORMAT
+# ============================================================
+
+FOR EACH TEAM:
+
+----------------------------------------
+TEAM: <TEAM>
+----------------------------------------
+
+SUMMARY:
+- Warehouse
+- Size
+- Role
+- Monitor
+
+DECISION:
+- Base size
+- Adjustments
+- Scaling
+- Cost strategy
+
+SQL:
+<statements>
+
+# ============================================================
+# 15. VALIDATION
+# ============================================================
+
+CHECK:
+- Naming compliance
+- Size correctness
+- Limits respected
+- SQL valid
+- Grants included
+- Resource monitor attached
+
+IF ANY FAIL → REGENERATE
+
+# ============================================================
+# 16. STRICT RULES
+# ============================================================
+
+- DO NOT guess
+- DO NOT skip validation
+- ALWAYS enforce cost controls
+- ALWAYS include ALTER (drift correction)
+- ALWAYS include performance configs
+- ALWAYS deterministic output
+- PROCESS each team independently
