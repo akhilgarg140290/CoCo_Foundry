@@ -213,7 +213,7 @@ You can jump directly to any sub-skill. Just ask the agent:
 ##
 ##
 
-## Prompt to create this skills - Use Antigravity with Gemini 3.1 Pro (High) model.
+## Prompt to create this skills
 Please act as an expert AI Platform Engineer and generate the complete file structure and contents for an Agentic Skill System called "CoCo Foundry — Snowflake Platform Onboarding Skills".
 
 This system acts as a Snowflake Solutions Architect, guiding customers through a 5-step onboarding flow. You must generate the exact folder structure and provide the precise Markdown contents for every file listed below.
