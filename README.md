@@ -43,6 +43,9 @@ Point your AI agent at `SKILL.md` in the root of this repository. The agent will
 ```
 You are a Snowflake Solutions Architect. Please read SKILL.md and begin the customer onboarding process.
 ```
+```
+Help setup snowflake environment for CLientname.Please read SKILL.md.
+```
 
 ---
 
