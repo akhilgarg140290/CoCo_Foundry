@@ -206,3 +206,96 @@ You can jump directly to any sub-skill. Just ask the agent:
 - ✅ Provide all source system names — they become your Bronze/Silver schema names.
 - ✅ Specify your ETL tools — the agent will create dedicated service account roles for them.
 - ⚠️ If you skip PII questions, the agent will warn you that masking defaults to **"No masking"**.
+
+##
+##
+##
+##
+##
+
+## Prompt to create this skills
+Please act as an expert AI Platform Engineer and generate the complete file structure and contents for an Agentic Skill System called "CoCo Foundry — Snowflake Platform Onboarding Skills".
+
+This system acts as a Snowflake Solutions Architect, guiding customers through a 5-step onboarding flow. You must generate the exact folder structure and provide the precise Markdown contents for every file listed below.
+
+### 1. File Structure to Generate
+Produce the following file structure and implement the requirements described for each file in the subsequent sections:
+```
+CoCo_Foundry/
+├── SKILL.md
+├── README.md
+└── skills/
+    ├── onboarding/
+    │   └── SKILL.md
+    ├── db_design/
+    │   └── SKILL.md
+    ├── rbac/
+    │   ├── SKILL.md
+    │   ├── access_roles/SKILL.md
+    │   └── functional_roles/SKILL.md
+    └── warehouse/
+        └── SKILL.md
+```
+
+### 2. File Generation Requirements
+
+Please output the literal markdown content for each of these files, conforming exactly to the rules below.
+
+#### File 1: `README.md`
+- Describe the system as an AI-powered interactive runbook for Snowflake onboarding.
+- Detail the 5-Step Flow:
+    1. Business Discovery (Q&A on Domain, Sources, Environments, Sensitivity/PII, Teams, ETL).
+    2. Database Layer Design (Generating Medallion architecture: Bronze, Silver, Gold, Config, Audit).
+    3. RBAC Configuration (Least-privilege role hierarchy: ACCOUNTADMIN -> SECURITYADMIN/SYSADMIN -> Functional Roles -> Access Roles).
+    4. Warehouse Provisioning (Sizing matrix from <100GB to >50TB, auto-suspend, resource monitors).
+    5. Review & Deliver (Outputting copy-paste ready SQL).
+- List "Important Rules": Always start with Onboarding, use IF NOT EXISTS, apply cost controls, follow Snowflake role hierarchy.
+
+#### File 2: `SKILL.md` (Main Orchestrator)
+- YAML Frontmatter: name `Snowflake Platform Onboarding`.
+- Persona: Expert Snowflake Solutions Architect.
+- Sub-skills table pointing to the 4 main sub-skills (Onboarding, DB Design, RBAC, Warehouse).
+- Workflows explicitly defined step by step. Tell the agent to read `skills/onboarding/SKILL.md` first, then DB Design, then RBAC, then Warehouse.
+
+#### File 3: `skills/onboarding/SKILL.md` (Onboarding Questionnaire)
+- YAML Frontmatter: name `Onboarding Questionnaire`.
+- Instructions: Ask questions one category at a time. Allow skips (mark as `[SKIPPED]`).
+- Categories to include in tables: 
+  1. Business Overview
+  2. Source Systems (Count, Names, Volume)
+  3. Environments (e.g. DEV, QA, PROD)
+  4. Data Sensitivity & Security (PII, Masking, Row access policies)
+  5. Teams & Users
+  6. ETL & Workload
+
+#### File 4: `skills/db_design/SKILL.md` (Database Design)
+- Template: `<ENV>_BRONZE.<SOURCE>`, `<ENV>_SILVER.<SOURCE>`, `<ENV>_GOLD.<DOMAIN>`, `CONFIG`, `AUDIT`, `GOVERNANCE.TAGS`.
+- Rule: Always use `USE ROLE SYSADMIN`.
+- Require Governance tags on databases/schemas (ENVIRONMENT, OWNER, SENSITIVITY, LAYER).
+- Gold schema inference based on source type.
+- Example output SQL mapping showing `CREATE DATABASE IF NOT EXISTS`, `CREATE SCHEMA IF NOT EXISTS`, and `ALTER ... SET TAG`.
+
+#### File 5: `skills/rbac/SKILL.md` (RBAC)
+- Define restrictive least-privilege RBAC.
+- Require specific RBAC Discovery Questions (e.g., Do you need DB-level access roles? dynamic masking? row access policies?).
+- Define the Hierarchy: `SYSADMIN -> FR_TEAM -> AR_DB_RO/RW`.
+- Define naming conventions for AR (Access Roles) and FR (Functional Roles).
+- Best practices: No direct user grants, use FUTURE GRANTS, dedicated roles for service accounts like dbt.
+- Mention it routes to `access_roles/SKILL.md` and `functional_roles/SKILL.md`.
+
+#### File 6: `skills/rbac/access_roles/SKILL.md` & `skills/rbac/functional_roles/SKILL.md`
+- Briefly create dummy files for these that instruct generating standard read-write (RW) and read-only (RO) grants on databases/schemas, and mapping FRs to those ARs using `GRANT ROLE ... TO ROLE`.
+
+#### File 7: `skills/warehouse/SKILL.md` (Warehouse Provisioning)
+- Naming convention: `WH_<TEAM>_<ENV>_<PURPOSE>`.
+- Core Sizing Logic constraints:
+   - <100GB -> XSMALL
+   - 100-500GB -> SMALL
+   - 500GB-2TB -> MEDIUM
+   - 2-10TB -> LARGE
+   - 10-50TB -> XLARGE
+   - >50TB -> 2XLARGE
+- Adjustments: ETL +1 size, DEV -1 size, HIGH criticality +1 size.
+- Auto-suspend defaults (DEV=120, QA=300, PROD varies).
+- Mandatory Cost Governance: CREATE RESOURCE MONITOR `RM_<TEAM>_<ENV>` (DEV=50 credits, QA=100, PROD=500), notify at 80%, suspend at 100%.
+- Generation layout: `CREATE ROLE`, `CREATE RESOURCE MONITOR`, `CREATE WAREHOUSE`, `ALTER WAREHOUSE ... SET TAG`, `GRANT ... TO ROLE`.
