@@ -36,7 +36,7 @@ CoCo_Foundry/
 
 ### Starting the Agent
 
-Point your AI agent at `SKILL.md` in the root of this repository. The agent will automatically route through the 5-step onboarding flow.
+Download this repository and upload in the root of snowflake workspace. Open Cortex Code and the agent will automatically route through the 5-step onboarding flow.
 
 **Recommended prompt to kick things off:**
 
@@ -44,7 +44,7 @@ Point your AI agent at `SKILL.md` in the root of this repository. The agent will
 You are a Snowflake Solutions Architect. Please read SKILL.md and begin the customer onboarding process.
 ```
 ```
-Help setup snowflake environment for CLientname.Please read SKILL.md.
+Help setup snowflake environment for "Clientname" . Please read SKILL.md file in <<mention folder name>>(ex- CoCo_Foundry) folder .
 ```
 
 ---
