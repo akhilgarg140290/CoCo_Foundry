@@ -56,3 +56,4 @@ Present the complete configuration to the customer in a single, well-organized d
 3. **Follow Snowflake best practices** — least-privilege access, separate warehouses per workload type, proper role hierarchy.
 4. **Be restrictive with RBAC** — never grant more access than necessary. When in doubt, ask the user.
 5. **Generate runnable SQL** — all output SQL should be copy-paste ready for Snowflake.
+6. **Create separate files per environment** — if the customer has multiple environments (e.g., DEV and PROD), generate a separate SQL file for each environment containing all scripts (database design, RBAC, warehouses, policies). For example, 2 environments = 2 files: `DEV_setup.sql` and `PROD_setup.sql`.
