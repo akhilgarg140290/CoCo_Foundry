@@ -35,7 +35,13 @@ Within each database, schemas follow source system naming:
 
 | Warehouse | Purpose | Size |
 |-----------|---------|------|
-| `{ENV}_ETL_WH`       | ETL / data loading     | {{ETL_WH_SIZE}} |
-| `{ENV}_ANALYTICS_WH` | BI / reporting queries  | {{ANALYTICS_WH_SIZE}} |
-| `{ENV}_ADHOC_WH`     | Ad-hoc / exploration    | {{ADHOC_WH_SIZE}} |
-| `{ENV}_DS_WH`        | Data science workloads  | {{DS_WH_SIZE}} |
+| `WH_{ENV}_{TEAM}_ETL`       | ETL / data loading     | {{ETL_WH_SIZE}} |
+| `WH_{ENV}_{TEAM}_ANALYTICS` | BI / reporting queries  | {{ANALYTICS_WH_SIZE}} |
+| `WH_{ENV}_{TEAM}_ADHOC`     | Ad-hoc / exploration    | {{ADHOC_WH_SIZE}} |
+| `WH_{ENV}_{TEAM}_DS`        | Data science workloads  | {{DS_WH_SIZE}} |
+
+## Resource Monitor Naming
+
+| Monitor | Scope |
+|---------|-------|
+| `RM_{ENV}_{PURPOSE}` | Per-purpose resource monitor |
