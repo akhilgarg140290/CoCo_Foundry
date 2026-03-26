@@ -36,7 +36,7 @@ CoCo_Foundry/
 
 ### Starting the Agent
 
-Download this repository and upload in the root of snowflake workspace. Open Cortex Code and the agent will automatically route through the 5-step onboarding flow.
+Clone this repository in local and upload the entire folder in Cortex Code. Once uploaded, Kickoff agent with below recommended prompts:
 
 **Recommended prompt to kick things off:**
 
