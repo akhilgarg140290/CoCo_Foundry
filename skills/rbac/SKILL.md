@@ -46,8 +46,8 @@ Before running this skill, ensure the **Business Profile** has been completed vi
 
 | Skill | Path | Purpose |
 |-------|------|---------|
-| **Access Roles** | `access_roles/SKILL.md` | Database/schema-level read/write roles and their grants |
-| **Functional Roles** | `functional_roles/SKILL.md` | Team-based roles that inherit from access roles |
+| **Access Roles** | `access_roles/SKILL.md` | **Database roles** — database/schema-level read/write roles and their grants |
+| **Functional Roles** | `functional_roles/SKILL.md` | Account-level team-based roles that inherit from database roles (access roles) |
 
 ## Snowflake RBAC Best Practices (MUST FOLLOW)
 
@@ -56,17 +56,16 @@ Before running this skill, ensure the **Business Profile** has been completed vi
                          │
                     ┌────┴────┐
                SECURITYADMIN  SYSADMIN
-                    │              │
-                    │    ┌─────────┼──────────┐
-                    │    │         │           │
-                    │  FR_DATA  FR_ANALYTICS  FR_MANAGERS
-                    │  _ENGG        │           │
-                    │    │     ┌────┴────┐      │
-                    │    │     │         │      │
-                    │  AR_DB  AR_DB    AR_DB   AR_DB
-                    │  _RW   _RO     _RO     _RO
-                    │
-              (manages all roles)
+               (manages roles)     │
+                         ┌─────────┼──────────┐
+                         │         │           │
+                       FR_DATA  FR_ANALYTICS  FR_MANAGERS
+                       _ENGG        │          _VIEWER
+                         │     ┌────┴────┐      │
+                         │     │         │      │
+                    {DB}.AR  {DB}.AR  {DB}.AR  {DB}.AR
+                    _ALL_RW  _ALL_RO  _ALL_RO  _ALL_RO
+                  (database roles scoped to their database)
 ```
 
 ### Rules
@@ -74,8 +73,8 @@ Before running this skill, ensure the **Business Profile** has been completed vi
 1. **ACCOUNTADMIN** — never used for daily operations. Only for account-level changes.
 2. **SECURITYADMIN** — owns and manages all custom roles. Grants role assignments.
 3. **SYSADMIN** — parent of all custom functional roles. Owns all databases and schemas.
-4. **Access Roles (AR_)** — grant object-level privileges (SELECT, INSERT, etc.). Named: `AR_{ENV}_{DB}_{SCHEMA}_{RO|RW}`
-5. **Functional Roles (FR_)** — assigned to users. Inherit from access roles. Named: `FR_{ENV}_{TEAM}_{LEVEL}`
+4. **Access Roles (AR_)** — implemented as **database roles**, scoped to their owning database. Grant object-level privileges (SELECT, INSERT, etc.). Named: `{ENV}_{DB}.AR_{SCHEMA}_{RO|RW}`. Created by `SYSADMIN` (database owner).
+5. **Functional Roles (FR_)** — account-level roles assigned to users. Inherit from database roles via `GRANT DATABASE ROLE`. Named: `FR_{ENV}_{TEAM}_{LEVEL}`
 6. **Never grant privileges directly to users** — always through roles.
 7. **Never grant ALL PRIVILEGES** — be explicit about what is granted.
 8. **Use FUTURE GRANTS** — ensures new objects automatically inherit the correct permissions.
