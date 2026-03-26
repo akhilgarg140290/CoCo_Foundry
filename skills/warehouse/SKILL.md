@@ -15,9 +15,10 @@ PURPOSE          : ETL | BI | ADHOC
 DATA_VOLUME      : e.g. 50GB, 200GB, 2TB
 
 ## Optional Inputs (Recommended)
-WORKLOAD_PATTERN : BATCH | INTERACTIVE | MIXED (default = MIXED)
-CRITICALITY      : LOW | MEDIUM | HIGH (default = MEDIUM)
-DRY_RUN          : TRUE | FALSE (default = FALSE)
+WORKLOAD_PATTERN    : BATCH | INTERACTIVE | MIXED (default = MIXED)
+CRITICALITY         : LOW | MEDIUM | HIGH (default = MEDIUM)
+MULTI_CLUSTER       : user must explicitly request multi-cluster; see Section 5
+DRY_RUN             : TRUE | FALSE (default = FALSE)
 
 # ============================================================
 # 2. INPUT VALIDATION
@@ -39,13 +40,13 @@ Normalize:
 # ============================================================
 
 WAREHOUSE:
-WH_<TEAM>_<ENV>_<PURPOSE>
+WH_{ENV}_{TEAM}_{PURPOSE}
 
 ROLE:
-ROLE_<TEAM>_<ENV>
+FR_{ENV}_{TEAM}_{LEVEL}
 
 RESOURCE MONITOR:
-RM_<TEAM>_<ENV>
+RM_{ENV}_{PURPOSE}
 
 # ============================================================
 # 4. WAREHOUSE SIZING
@@ -78,21 +79,32 @@ MAX = 3XLARGE
 # 5. SCALING STRATEGY
 # ============================================================
 
-ETL:
-  MIN_CLUSTER = 1
-  MAX_CLUSTER = 3
+## Default: ALWAYS single-cluster
+ALL warehouses MUST be generated with:
+  MIN_CLUSTER_COUNT = 1
+  MAX_CLUSTER_COUNT = 1
 
-BI:
-  MIN_CLUSTER = 1
-  MAX_CLUSTER = 2
+Do NOT prompt the user about scaling. Do NOT infer multi-cluster
+from PURPOSE, ENV, WORKLOAD_PATTERN, or DATA_VOLUME.
 
-ADHOC:
-  MIN_CLUSTER = 1
-  MAX_CLUSTER = 1
+## Override: User explicitly requests multi-cluster
+Only if the user explicitly states they want multi-cluster warehouses,
+apply the following based on their specified preference:
 
-IF WORKLOAD_PATTERN = BATCH:
-  MAX_CLUSTER += 1
+  MODERATE:
+    MIN_CLUSTER_COUNT = 1
+    MAX_CLUSTER_COUNT = 2
 
+  AGGRESSIVE:
+    MIN_CLUSTER_COUNT = 1
+    ETL   → MAX_CLUSTER_COUNT = 3
+    BI    → MAX_CLUSTER_COUNT = 2
+    ADHOC → MAX_CLUSTER_COUNT = 2
+    IF WORKLOAD_PATTERN = BATCH: MAX_CLUSTER_COUNT += 1
+
+## Constraints
+MIN_CLUSTER_COUNT always = 1
+MAX_CLUSTER_COUNT ceiling = 10
 SCALING_POLICY = STANDARD
 
 # ============================================================
@@ -127,7 +139,7 @@ MAX_CONCURRENCY_LEVEL:
 # 8. COST GOVERNANCE (MANDATORY)
 # ============================================================
 
-CREATE RESOURCE MONITOR IF NOT EXISTS RM_<TEAM>_<ENV>
+CREATE RESOURCE MONITOR IF NOT EXISTS RM_{ENV}_{PURPOSE}
 WITH CREDIT_QUOTA =
   DEV → 50
   QA → 100
@@ -143,15 +155,15 @@ TRIGGERS:
 
 IF DATA_VOLUME > 10TB AND PURPOSE = ETL:
   CREATE:
-    WH_<TEAM>_<ENV>_ETL_LOAD
-    WH_<TEAM>_<ENV>_ETL_TRANSFORM
+    WH_{ENV}_{TEAM}_ETL_LOAD
+    WH_{ENV}_{TEAM}_ETL_TRANSFORM
 
 # ============================================================
 # 10. GOVERNANCE
 # ============================================================
 
 COMMENT:
-<TEAM> <ENV> warehouse for <PURPOSE> | Volume: <DATA_VOLUME>
+{TEAM} {ENV} warehouse for {PURPOSE} | Volume: {DATA_VOLUME}
 
 TAGS:
 TEAM, ENV, PURPOSE
@@ -160,7 +172,8 @@ TEAM, ENV, PURPOSE
 # 11. ROLE MANAGEMENT
 # ============================================================
 
-CREATE ROLE IF NOT EXISTS ROLE_<TEAM>_<ENV>
+USE existing functional roles (FR_{ENV}_{TEAM}_{LEVEL}) from RBAC skill.
+Do NOT create separate warehouse roles — grant USAGE to functional roles.
 
 GRANT ROLE TO SYSADMIN
 
@@ -168,16 +181,14 @@ GRANT ROLE TO SYSADMIN
 # 12. SQL GENERATION
 # ============================================================
 
-CREATE ROLE IF NOT EXISTS ROLE_<TEAM>_<ENV>;
-
-CREATE RESOURCE MONITOR IF NOT EXISTS RM_<TEAM>_<ENV>
+CREATE RESOURCE MONITOR IF NOT EXISTS RM_{ENV}_{PURPOSE}
 WITH CREDIT_QUOTA = <value>
 FREQUENCY = MONTHLY
 TRIGGERS
   ON 80 PERCENT DO NOTIFY
   ON 100 PERCENT DO SUSPEND;
 
-CREATE WAREHOUSE IF NOT EXISTS WH_<TEAM>_<ENV>_<PURPOSE>
+CREATE WAREHOUSE IF NOT EXISTS WH_{ENV}_{TEAM}_{PURPOSE}
   WAREHOUSE_SIZE = '<SIZE>'
   AUTO_SUSPEND = <value>
   AUTO_RESUME = TRUE
@@ -189,22 +200,22 @@ CREATE WAREHOUSE IF NOT EXISTS WH_<TEAM>_<ENV>_<PURPOSE>
   MAX_CONCURRENCY_LEVEL = <concurrency>
   COMMENT = '<comment>';
 
-ALTER WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE>
-SET RESOURCE_MONITOR = RM_<TEAM>_<ENV>;
+ALTER WAREHOUSE WH_{ENV}_{TEAM}_{PURPOSE}
+SET RESOURCE_MONITOR = RM_{ENV}_{PURPOSE};
 
-ALTER WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE>
+ALTER WAREHOUSE WH_{ENV}_{TEAM}_{PURPOSE}
 SET TAG TEAM='<TEAM>', ENV='<ENV>', PURPOSE='<PURPOSE>';
 
-ALTER WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE>
+ALTER WAREHOUSE WH_{ENV}_{TEAM}_{PURPOSE}
 SET
   WAREHOUSE_SIZE = '<SIZE>',
   AUTO_SUSPEND = <value>,
   MIN_CLUSTER_COUNT = <min>,
   MAX_CLUSTER_COUNT = <max>;
 
-GRANT USAGE ON WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE> TO ROLE ROLE_<TEAM>_<ENV>;
-GRANT OPERATE ON WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE> TO ROLE ROLE_<TEAM>_<ENV>;
-GRANT MONITOR ON WAREHOUSE WH_<TEAM>_<ENV>_<PURPOSE> TO ROLE ROLE_<TEAM>_<ENV>;
+GRANT USAGE ON WAREHOUSE WH_{ENV}_{TEAM}_{PURPOSE} TO ROLE FR_{ENV}_{TEAM}_{LEVEL};
+GRANT OPERATE ON WAREHOUSE WH_{ENV}_{TEAM}_{PURPOSE} TO ROLE FR_{ENV}_{TEAM}_ADMIN;
+GRANT MONITOR ON WAREHOUSE WH_{ENV}_{TEAM}_{PURPOSE} TO ROLE FR_{ENV}_{TEAM}_ADMIN;
 
 # ============================================================
 # 13. DRY RUN MODE
@@ -223,14 +234,14 @@ IF DRY_RUN = TRUE:
 FOR EACH TEAM:
 
 ----------------------------------------
-TEAM: <TEAM>
+TEAM: {TEAM}
 ----------------------------------------
 
 SUMMARY:
-- Warehouse
+- Warehouse (WH_{ENV}_{TEAM}_{PURPOSE})
 - Size
-- Role
-- Monitor
+- Functional Role (FR_{ENV}_{TEAM}_{LEVEL})
+- Monitor (RM_{ENV}_{PURPOSE})
 
 DECISION:
 - Base size
